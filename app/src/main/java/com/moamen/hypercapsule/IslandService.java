@@ -74,6 +74,9 @@ public class IslandService extends Service {
   boolean phoneRegistered=false;
   MediaSessionManager msm; MediaController mc;
   boolean musicPlaying=false; String songTitle="",songArtist=""; Bitmap art=null;
+  // media-notification fallback (players that publish no public MediaSession)
+  String mnPkg="",mnTitle="",mnArtist=""; android.graphics.drawable.Drawable mnArt=null;
+  PendingIntent mnPrev=null,mnPlay=null,mnNext=null; boolean mnActive=false;
   boolean charging=false; int battLevel=0;
   float downY=0; boolean moved=false;
 
@@ -218,11 +221,11 @@ public class IslandService extends Service {
     brow.addView(btnPrev,blp); brow.addView(btnPlay,blp); brow.addView(btnNext,blp);
     boxMusic.addView(brow,new LinearLayout.LayoutParams(-1,-2));
 
-    btnPrev.setOnClickListener(v->{ if(mc!=null) mc.getTransportControls().skipToPrevious(); });
-    btnNext.setOnClickListener(v->{ if(mc!=null) mc.getTransportControls().skipToNext(); });
+    btnPrev.setOnClickListener(v->{ if(mc!=null) mc.getTransportControls().skipToPrevious(); else fireIntent(mnPrev); });
+    btnNext.setOnClickListener(v->{ if(mc!=null) mc.getTransportControls().skipToNext(); else fireIntent(mnNext); });
     btnPlay.setOnClickListener(v->{
-      if(mc==null) return;
-      if(musicPlaying) mc.getTransportControls().pause(); else mc.getTransportControls().play();
+      if(mc!=null){ if(musicPlaying) mc.getTransportControls().pause(); else mc.getTransportControls().play(); }
+      else fireIntent(mnPlay);
     });
     root.addView(boxMusic,new LinearLayout.LayoutParams(-1,-1));
   }
@@ -304,6 +307,21 @@ public class IslandService extends Service {
     musicPlaying = st!=null && st.getState()==PlaybackState.STATE_PLAYING;
   }
 
+  // ---- media notification fallback ----
+  void showMediaNotif(String pkg,String title,String artist,android.graphics.drawable.Drawable icon,
+      PendingIntent prev,PendingIntent play,PendingIntent next,boolean ongoing){
+    mnPkg=pkg==null?"":pkg; mnTitle=title==null?"":title; mnArtist=artist==null?"":artist;
+    mnArt=icon; mnPrev=prev; mnPlay=play; mnNext=next; mnActive=true;
+    refresh();
+  }
+  void onNotifRemoved(String pkg){
+    if(pkg!=null && pkg.equals(mnPkg)){ mnActive=false; mnPkg=""; refresh(); }
+  }
+  void fireIntent(PendingIntent pi){
+    if(pi==null) return;
+    try{ pi.send(); }catch(Exception e){}
+  }
+
   // ---- battery ----
   BroadcastReceiver batt=new BroadcastReceiver(){
     public void onReceive(Context c,Intent i){
@@ -356,8 +374,10 @@ public class IslandService extends Service {
     else if(mode==M_IDLE && lastText.length()>0){ flashUntil=System.currentTimeMillis()+10000; refresh(); }
   }
 
+  int tickCount=0;
   Runnable tick=new Runnable(){ public void run(){
     maybeRegisterPhone();
+    if(++tickCount%3==0) pickSession();
     long now=System.currentTimeMillis();
     if(timerEnd>0 && now>=timerEnd){ timerEnd=0; lastTitle="انتهى المؤقت ⏰"; lastText=""; lastIcon=null; flashUntil=now+8000; }
     refresh(); h.postDelayed(this,1000); } };
@@ -367,7 +387,7 @@ public class IslandService extends Service {
     long now=System.currentTimeMillis();
     if(callState!=TelephonyManager.CALL_STATE_IDLE) m=M_CALL;
     else if(timerEnd>now || swRunning) m=M_TIMER;
-    else if(musicPlaying) m=M_MUSIC;
+    else if(musicPlaying || mnActive) m=M_MUSIC;
     else if(now<flashUntil) m=M_FLASH;
     else if(now<chargeFlashUntil) m=M_CHARGE;
     else if(now<unlockFlashUntil) m=M_UNLOCK;
@@ -425,20 +445,29 @@ public class IslandService extends Service {
         w=Math.max(W0+dp(100),dp(230)); hgt=Math.max(H0+dp(12),dp(50));
         setCompact(callState==TelephonyManager.CALL_STATE_RINGING?"📞 مكالمة واردة":"📞 مكالمة جارية","");
         break;
-      case M_MUSIC:
+      case M_MUSIC: {
+        boolean useSession = musicPlaying;
+        String dt = useSession?songTitle:(mnTitle.length()==0?songTitle:mnTitle);
+        String da = useSession?songArtist:(mnArtist.length()==0?songArtist:mnArtist);
         if(musicExpanded){
           w=(int)(screenW*0.86f); hgt=dp(168);
           rowCompact.setVisibility(View.GONE);
           boxMusic.setVisibility(View.VISIBLE);
-          if(art!=null) imgArt.setImageBitmap(art); else imgArt.setImageResource(android.R.drawable.ic_media_play);
-          txtTitle.setText(songTitle); txtArtist.setText(songArtist);
+          if(useSession && art!=null) imgArt.setImageBitmap(art);
+          else if(mnArt!=null) imgArt.setImageDrawable(mnArt);
+          else imgArt.setImageResource(android.R.drawable.ic_media_play);
+          txtTitle.setText(dt); txtArtist.setText(da);
           btnPlay.setText(musicPlaying?"⏸":"⏯");
+          btnPrev.setVisibility(useSession||mnPrev!=null?View.VISIBLE:View.GONE);
+          btnNext.setVisibility(useSession||mnNext!=null?View.VISIBLE:View.GONE);
         }else{
           w=Math.max(W0+dp(110),dp(230)); hgt=Math.max(H0+dp(18),dp(56));
-          if(art!=null){ imgIcon.setVisibility(View.VISIBLE); imgIcon.setImageBitmap(art); }
-          setCompact(songTitle.length()==0?"🎵 موسيقى":songTitle,songArtist);
+          if(useSession && art!=null){ imgIcon.setVisibility(View.VISIBLE); imgIcon.setImageBitmap(art); }
+          else if(mnArt!=null){ imgIcon.setVisibility(View.VISIBLE); imgIcon.setImageDrawable(mnArt); }
+          setCompact(dt.length()==0?"🎵 موسيقى":dt,da);
         }
         break;
+      }
     }
     if(lp.width!=w || lp.height!=hgt) animateTo(w,hgt,animate);
   }
