@@ -10,9 +10,6 @@ mkdir -p shots
 adb wait-for-device
 while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do sleep 5; done
 echo "== boot complete =="
-adb root
-sleep 2
-adb wait-for-device
 adb logcat -c
 
 adb install -r app/build/outputs/apk/debug/app-debug.apk || exit 1
@@ -39,7 +36,10 @@ adb shell am start -n $PKG/.MainActivity
 sleep 4
 adb shell screencap -p /sdcard/01_setup.png
 
-echo "== start IslandService (adb root bypasses exported=false) =="
+echo "== start IslandService (adb root bypasses exported=false; root only AFTER secure-settings writes) =="
+adb root
+sleep 2
+adb wait-for-device
 adb shell am start-foreground-service -n $PKG/.IslandService
 sleep 3
 adb shell dumpsys activity services $PKG > shots/services.txt
