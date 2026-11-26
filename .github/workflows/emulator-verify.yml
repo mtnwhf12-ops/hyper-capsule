@@ -2,6 +2,8 @@ name: Emulator runtime verification
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ repair/* ]
 
 permissions:
   contents: read
