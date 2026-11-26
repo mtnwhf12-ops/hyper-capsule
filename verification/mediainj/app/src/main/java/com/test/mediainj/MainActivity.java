@@ -61,7 +61,15 @@ public class MainActivity extends Activity {
   }
 
   void toggleNotif(){ if(nm.getActiveNotifications().length>0){ removeNotif(); return; } postNotif(); }
-  void removeNotif(){ nm.cancel(7); }
+  void removeNotif(){ nm.cancel(7); nm.cancel(9); }
+  void plainNotif(){
+    Notification n=new Notification.Builder(this,"m")
+      .setSmallIcon(android.R.drawable.ic_dialog_email)
+      .setContentTitle("Test Notification Title")
+      .setContentText("Test notification body text")
+      .build();
+    nm.notify(9,n);
+  }
   void postNotif(){
     Notification.Action prev=new Notification.Action.Builder(android.R.drawable.ic_media_previous,"Previous",act("prev")).build();
     Notification.Action play=new Notification.Action.Builder(android.R.drawable.ic_media_play,"Play",act("play")).build();

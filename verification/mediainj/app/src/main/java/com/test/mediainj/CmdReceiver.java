@@ -12,6 +12,7 @@ public class CmdReceiver extends BroadcastReceiver {
       case "session_pause": a.setState(false); break;
       case "notif_post": a.postNotif(); break;
       case "notif_remove": a.removeNotif(); break;
+      case "plain_notif": a.plainNotif(); break;
     }
   }
 }
