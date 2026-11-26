@@ -34,6 +34,14 @@ public class MainActivity extends Activity {
     l.addView(b1); l.addView(b2);
     setContentView(l);
     ensureSession();
+    if(getIntent()!=null && "1".equals(getIntent().getStringExtra("auto"))){
+      android.os.Handler hh=new android.os.Handler();
+      hh.postDelayed(()->setState(true), 1000);          // t+1 session PLAYING
+      hh.postDelayed(()->setState(false), 7000);         // t+7 pause
+      hh.postDelayed(()->postNotif(), 9000);             // t+9 MediaStyle ongoing
+      hh.postDelayed(()->plainNotif(), 15000);           // t+15 plain notification
+      hh.postDelayed(()->removeNotif(), 22000);          // t+22 cleanup
+    }
   }
 
   void ensureSession(){

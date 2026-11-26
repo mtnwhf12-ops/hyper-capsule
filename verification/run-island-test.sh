@@ -70,33 +70,16 @@ adb shell input keyevent KEYCODE_HOME
 sleep 3
 adb shell screencap -p /sdcard/02_idle.png
 
-echo "== launch injector and KEEP it foreground (background apps cannot receive manifest broadcasts) =="
-adb shell am start -n $INJ/.MainActivity
-sleep 3
-
-echo "== 03 music via MediaSession path =="
-adb shell am broadcast --receiver-foreground -a com.test.mediainj.CMD --es cmd session_play
-sleep 5
+echo "== launch injector with self-timed sequence (no broadcast delivery involved) =="
+adb shell am start -n $INJ/.MainActivity --es auto 1
+sleep 4
 adb shell screencap -p /sdcard/03_music_session.png
-
-adb shell am broadcast --receiver-foreground -a com.test.mediainj.CMD --es cmd session_pause
-sleep 3
-
-echo "== 04 music via MediaStyle notification fallback =="
-adb shell am broadcast --receiver-foreground -a com.test.mediainj.CMD --es cmd notif_post
-sleep 5
+sleep 8
 adb shell screencap -p /sdcard/04_music_notif.png
-
-echo "== 05 plain notification flash =="
-adb shell am broadcast --receiver-foreground -a com.test.mediainj.CMD --es cmd plain_notif
-sleep 3
+sleep 5
 adb shell screencap -p /sdcard/05_notif_flash.png
-
-echo "== 06 after collapse =="
-sleep 6
+sleep 8
 adb shell screencap -p /sdcard/06_after_collapse.png
-
-adb shell am broadcast --receiver-foreground -a com.test.mediainj.CMD --es cmd notif_remove 2>/dev/null
 
 for f in 01_setup 02_idle 03_music_session 04_music_notif 05_notif_flash 06_after_collapse; do
   adb pull /sdcard/$f.png shots/$f.png || { echo "FATAL: missing $f"; exit 1; }
