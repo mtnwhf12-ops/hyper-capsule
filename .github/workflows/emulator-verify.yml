@@ -44,7 +44,7 @@ jobs:
           api-level: 29
           target: default
           arch: x86_64
-          profile: pixel 5
+          profile: pixel_5
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -prop ro.product.locale=en -prop persist.sys.locale=en-US
           disable-animations: false
