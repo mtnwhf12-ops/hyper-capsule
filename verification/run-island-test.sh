@@ -84,6 +84,8 @@ adb shell am broadcast -a com.test.mediainj.CMD --es cmd notif_remove 2>/dev/nul
 for f in 01_setup 02_idle 03_music_session 04_music_notif 05_notif_flash 06_after_collapse; do
   adb pull /sdcard/$f.png shots/$f.png || { echo "FATAL: missing $f"; exit 1; }
 done
+adb shell dumpsys notification > shots/dumpsys_notification.txt 2>/dev/null
+adb shell dumpsys media_session > shots/dumpsys_media_session.txt 2>/dev/null
 adb logcat -d > shots/logcat_full.txt
 ls -la shots/
 echo "== verification script completed =="

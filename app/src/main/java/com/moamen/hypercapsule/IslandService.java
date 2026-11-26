@@ -1,4 +1,5 @@
 package com.moamen.hypercapsule;
+import android.util.Log;
 
 import android.animation.ValueAnimator;
 import android.app.Notification;
@@ -81,6 +82,7 @@ public class IslandService extends Service {
   float downY=0; boolean moved=false;
 
   public void onCreate(){
+    Log.i("HyperCapsule","IslandService onCreate");
     super.onCreate(); inst=this;
     NotificationChannel ch=new NotificationChannel("island","Island",NotificationManager.IMPORTANCE_MIN);
     getSystemService(NotificationManager.class).createNotificationChannel(ch);
@@ -274,6 +276,7 @@ public class IslandService extends Service {
     public void onSessionDestroyed(){ mc=null; musicPlaying=false; pickSession(); refresh(); }
   };
   void pickSession(){
+    try{ List<MediaController> ls=msm.getActiveSessions(new ComponentName(this,NotifListener.class)); Log.i("HyperCapsule","pickSession sessions="+(ls==null?-1:ls.size())); }catch(Exception e){ Log.w("HyperCapsule","pickSession err "+e); }
     try{
       List<MediaController> ss=msm.getActiveSessions(new ComponentName(this,NotifListener.class));
       MediaController best=null;
@@ -362,6 +365,7 @@ public class IslandService extends Service {
 
   // ---- notifications ----
   void showNotif(String title,String text,Drawable icon){
+    Log.i("HyperCapsule","showNotif: "+title);
     lastTitle=title==null?"":title; lastText=text==null?"":text; lastIcon=icon;
     flashUntil=System.currentTimeMillis()+6000;
     refresh();
