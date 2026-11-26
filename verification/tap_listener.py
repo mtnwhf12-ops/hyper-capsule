@@ -14,7 +14,8 @@ for i, n in enumerate(nodes):
     text = re.search(r'text="([^"]*)"', n)
     desc = re.search(r'content-desc="([^"]*)"', n)
     t = (text.group(1) if text else '') + ' ' + (desc.group(1) if desc else '')
-    if target.lower() in t.lower():
+    hit = (t.strip().lower() == target.lower()) if target.lower() == 'allow' else (target.lower() in t.lower())
+    if hit:
         if target.lower() == 'allow':
             b = bounds_of(n);  c = center(b) if b else None
             if c: print(c); sys.exit(0)
