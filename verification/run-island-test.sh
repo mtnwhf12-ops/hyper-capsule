@@ -28,19 +28,27 @@ echo "== warm-up launch: take app out of stopped state before enabling listener 
 adb shell am start -n $PKG/.MainActivity
 sleep 4
 
-ok=0
-for i in 1 2 3; do
-  adb shell settings put secure enabled_notification_listeners ""
-  sleep 2
-  adb shell settings put secure enabled_notification_listeners $LSN
-  sleep 3
-  adb shell dumpsys notification > /tmp/dn.txt 2>/dev/null
-  if grep -A3 "Allowed notification listeners" /tmp/dn.txt | grep -q "$LSN"; then ok=1; break; fi
-  echo "attempt $i: NMS has not bound our listener yet"
-done
+echo "== enable listener via Settings UI (real user path) =="
+adb shell am start -a android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+sleep 5
+adb shell uiautomator dump /sdcard/ui.xml 2>/dev/null
+adb pull /sdcard/ui.xml /tmp/ui.xml 2>/dev/null
+COORDS=$(python3 verification/tap_listener.py /tmp/ui.xml "Hyper Capsule" 2>/dev/null)
+[ -n "$COORDS" ] || { echo "FATAL: app entry not found in listener settings UI"; cp /tmp/ui.xml shots/ui_listeners.xml; exit 1; }
+echo "tapping entry at $COORDS"
+adb shell input tap $COORDS
+sleep 2
+adb shell uiautomator dump /sdcard/ui2.xml 2>/dev/null
+adb pull /sdcard/ui2.xml /tmp/ui2.xml 2>/dev/null
+ALLOW=$(python3 verification/tap_listener.py /tmp/ui2.xml "Allow" 2>/dev/null)
+if [ -n "$ALLOW" ]; then echo "confirm dialog, tapping Allow at $ALLOW"; adb shell input tap $ALLOW; sleep 2; fi
+cp /tmp/ui2.xml shots/ui_after_tap.xml
+adb shell input keyevent KEYCODE_HOME
+sleep 1
+adb shell dumpsys notification > /tmp/dn.txt 2>/dev/null
 cp /tmp/dn.txt shots/dumpsys_notification_early.txt
-[ "$ok" = "1" ] || { echo "FATAL: NMS never allowed our listener after warm-up + 3 toggle attempts"; exit 1; }
-echo "listener bound per NMS"
+grep -A3 "Allowed notification listeners" /tmp/dn.txt | grep -q "$LSN" || { echo "FATAL: UI toggle did not bind listener"; exit 1; }
+echo "listener bound via Settings UI"
 
 echo "== 01 setup UI (both permissions should now read enabled) =="
 adb shell am start -n $PKG/.MainActivity
