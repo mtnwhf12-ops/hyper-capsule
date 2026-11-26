@@ -70,11 +70,9 @@ adb shell input keyevent KEYCODE_HOME
 sleep 3
 adb shell screencap -p /sdcard/02_idle.png
 
-echo "== launch injector once (creates MediaSession) =="
+echo "== launch injector and KEEP it foreground (background apps cannot receive manifest broadcasts) =="
 adb shell am start -n $INJ/.MainActivity
 sleep 3
-adb shell input keyevent KEYCODE_HOME
-sleep 2
 
 echo "== 03 music via MediaSession path =="
 adb shell am broadcast --receiver-foreground -a com.test.mediainj.CMD --es cmd session_play
