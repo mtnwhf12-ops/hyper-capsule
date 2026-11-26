@@ -21,29 +21,30 @@ OV=$(adb shell appops get $PKG SYSTEM_ALERT_WINDOW | tr -d '\r')
 echo "appops: $OV"
 echo "$OV" | grep -q "allow" || { echo "FATAL: overlay op not allowed"; exit 1; }
 
+adb shell pm grant $PKG android.permission.READ_PHONE_STATE 2>/dev/null
+adb shell pm grant $INJ android.permission.POST_NOTIFICATIONS 2>/dev/null
+
+echo "== warm-up launch: take app out of stopped state before enabling listener =="
+adb shell am start -n $PKG/.MainActivity
+sleep 4
+
 ok=0
 for i in 1 2 3; do
   adb shell settings put secure enabled_notification_listeners ""
   sleep 2
   adb shell settings put secure enabled_notification_listeners $LSN
   sleep 3
-  CUR=$(adb shell settings get secure enabled_notification_listeners | tr -d '\r')
-  echo "attempt $i listeners setting: $CUR"
   adb shell dumpsys notification > /tmp/dn.txt 2>/dev/null
   if grep -A3 "Allowed notification listeners" /tmp/dn.txt | grep -q "$LSN"; then ok=1; break; fi
   echo "attempt $i: NMS has not bound our listener yet"
 done
 cp /tmp/dn.txt shots/dumpsys_notification_early.txt
-[ "$ok" = "1" ] || { echo "FATAL: NMS never allowed our listener after 3 toggle attempts"; exit 1; }
-echo "$CUR" > shots/listeners.txt
+[ "$ok" = "1" ] || { echo "FATAL: NMS never allowed our listener after warm-up + 3 toggle attempts"; exit 1; }
 echo "listener bound per NMS"
 
-adb shell pm grant $PKG android.permission.READ_PHONE_STATE 2>/dev/null
-adb shell pm grant $INJ android.permission.POST_NOTIFICATIONS 2>/dev/null
-
-echo "== 01 setup UI =="
+echo "== 01 setup UI (both permissions should now read enabled) =="
 adb shell am start -n $PKG/.MainActivity
-sleep 4
+sleep 3
 adb shell screencap -p /sdcard/01_setup.png
 
 echo "== start IslandService (adb root bypasses exported=false; root only AFTER secure-settings writes) =="
