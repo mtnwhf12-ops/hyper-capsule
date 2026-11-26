@@ -1,39 +1,49 @@
 #!/usr/bin/env bash
 # Runtime verification for Hyper Capsule on an emulator (CI).
-# Produces screenshots + logs under shots/ as artifacts.
+# FAILS LOUDLY when a setup step does not take effect; screenshots alone are not proof.
 set -u
 PKG=com.moamen.hypercapsule
 INJ=com.test.mediainj
+LSN=$PKG/$PKG.NotifListener
 mkdir -p shots
 
 adb wait-for-device
 while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do sleep 5; done
 echo "== boot complete =="
+adb logcat -c
 
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb install -r verification/mediainj/app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk || exit 1
+adb install -r verification/mediainj/app/build/outputs/apk/debug/app-debug.apk || exit 1
 
+echo "== grant overlay + listener =="
 adb shell appops set $PKG SYSTEM_ALERT_WINDOW allow
+OV=$(adb shell appops get $PKG SYSTEM_ALERT_WINDOW | tr -d '\r')
+echo "appops: $OV"
+echo "$OV" | grep -q "allow" || { echo "FATAL: overlay op not allowed"; exit 1; }
+
+adb shell settings put secure enabled_notification_listeners $LSN
+sleep 2
 CUR=$(adb shell settings get secure enabled_notification_listeners | tr -d '\r')
-LSN=$PKG/$PKG.NotifListener
-case "$CUR" in
-  *$LSN*) ;;
-  ""|null) adb shell settings put secure enabled_notification_listeners $LSN ;;
-  *) adb shell settings put secure enabled_notification_listeners "$CUR:$LSN" ;;
-esac
+echo "listeners now: $CUR"
+echo "$CUR" > shots/listeners.txt
+echo "$CUR" | grep -q "$LSN" || { echo "FATAL: notification listener not enabled"; exit 1; }
+
 adb shell pm grant $PKG android.permission.READ_PHONE_STATE 2>/dev/null
 adb shell pm grant $INJ android.permission.POST_NOTIFICATIONS 2>/dev/null
-sleep 2
-adb shell settings get secure enabled_notification_listeners > shots/listeners.txt
 
 echo "== 01 setup UI =="
 adb shell am start -n $PKG/.MainActivity
 sleep 4
 adb shell screencap -p /sdcard/01_setup.png
 
+echo "== start IslandService via exported BootReceiver =="
+adb shell am broadcast -a android.intent.action.BOOT_COMPLETED -n $PKG/.BootReceiver
+sleep 3
+adb shell dumpsys activity services $PKG > shots/services.txt
+grep -q "IslandService" shots/services.txt || { echo "FATAL: IslandService not running"; cat shots/services.txt; exit 1; }
+echo "IslandService running"
+
 echo "== 02 idle island over launcher =="
-adb shell am start-foreground-service -n $PKG/.IslandService
-sleep 2
 adb shell input keyevent KEYCODE_HOME
 sleep 3
 adb shell screencap -p /sdcard/02_idle.png
@@ -69,7 +79,8 @@ adb shell screencap -p /sdcard/06_after_collapse.png
 adb shell am broadcast -a com.test.mediainj.CMD --es cmd notif_remove 2>/dev/null
 
 for f in 01_setup 02_idle 03_music_session 04_music_notif 05_notif_flash 06_after_collapse; do
-  adb pull /sdcard/$f.png shots/$f.png || echo "MISSING $f"
+  adb pull /sdcard/$f.png shots/$f.png || { echo "FATAL: missing $f"; exit 1; }
 done
-adb logcat -d -t 800 > shots/logcat_tail.txt
+adb logcat -d > shots/logcat_full.txt
 ls -la shots/
+echo "== verification script completed =="
